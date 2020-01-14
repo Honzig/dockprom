@@ -24,10 +24,6 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     restart: unless-stopped
-    expose:
-      - 9090
-    networks:
-      - monitor-net
     labels:
       org.label-schema.group: "monitoring"
 
@@ -40,10 +36,6 @@ services:
       - '--config.file=/etc/alertmanager/config.yml'
       - '--storage.path=/alertmanager'
     restart: unless-stopped
-    expose:
-      - 9093
-    networks:
-      - monitor-net
     labels:
       org.label-schema.group: "monitoring"
 
@@ -60,14 +52,10 @@ services:
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
-    expose:
-      - 9100
-    networks:
-      - monitor-net
     labels:
       org.label-schema.group: "monitoring"
 
-  cadvisor:
+ cadvisor:
     image: gcr.io/google-containers/cadvisor:v0.34.0
     container_name: cadvisor
     volumes:
@@ -75,18 +63,14 @@ services:
       - /var/run:/var/run:rw
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
-      #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+      - /cgroup:/cgroup:ro
     restart: unless-stopped
-    expose:
-      - 8080
-    networks:
-      - monitor-net
     labels:
       org.label-schema.group: "monitoring"
 
-  grafana:
+  grafanaMonitor:
     image: grafana/grafana:6.5.2
-    container_name: grafana
+    container_name: grafanaMonitor
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -94,11 +78,11 @@ services:
       - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - "VIRTUAL_HOST=URL"
+      - "LETSENCRYPT_HOST=URL"
+      - "LETSENCRYPT_EMAIL=vojir@xxx"
+      - "VIRTUAL_PORT=3000"
     restart: unless-stopped
-    expose:
-      - 3000
-    networks:
-      - monitor-net
     labels:
       org.label-schema.group: "monitoring"
 
@@ -106,28 +90,9 @@ services:
     image: prom/pushgateway:v1.0.1
     container_name: pushgateway
     restart: unless-stopped
-    expose:
-      - 9091
-    networks:
-      - monitor-net
     labels:
       org.label-schema.group: "monitoring"
-
-  caddy:
-    image: stefanprodan/caddy
-    container_name: caddy
-    ports:
-      - "3000:3000"
-      - "9090:9090"
-      - "9093:9093"
-      - "9091:9091"
-    volumes:
-      - ./caddy:/etc/caddy
-    environment:
-      - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
-    restart: unless-stopped
-    networks:
-      - monitor-net
-    labels:
-      org.label-schema.group: "monitoring"
+networks:
+  default:
+    external:
+      name: monitor-net
